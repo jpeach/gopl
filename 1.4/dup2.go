@@ -11,11 +11,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 )
 
 func main() {
-	counts := make(map[string]int)
+	// Make a map of string to map of counts per filename
+	counts := make(map[string]map[string]int)
 	files := os.Args[1:]
 	if len(files) == 0 {
 		countLines(os.Stdin, counts)
@@ -30,19 +32,42 @@ func main() {
 			f.Close()
 		}
 	}
-	for line, n := range counts {
-		if n > 1 {
-			fmt.Printf("%d\t'%s'\n", n, line)
+	for line, matches := range counts {
+		total := 0
+		names := make([]string, 0)
+		for name, count := range matches {
+			total += count
+			names = append(names, name)
+		}
+
+		if total > 1 {
+			fmt.Printf("%d\t'%s'\n", total, line)
+			fmt.Printf("%v\n", names)
 		}
 	}
 }
 
-func countLines(f *os.File, counts map[string]int) {
+func countLines(f *os.File, counts map[string]map[string]int) {
 	input := bufio.NewScanner(f)
-	for input.Scan() {
-		counts[input.Text()]++
+
+	for {
+		if ok := input.Scan(); !ok {
+			// If we got an actual error (not io.EOF), puke it out.
+			if err := input.Err(); err != nil {
+				log.Fatalf("I/O error reading '%s': %s",
+					f.Name(), err)
+			}
+
+			return
+		}
+
+		text := input.Text()
+		if _, ok := counts[text]; !ok {
+			counts[text] = map[string]int{f.Name(): 1}
+		} else {
+			counts[input.Text()][f.Name()]++
+		}
 	}
-	// NOTE: ignoring potential errors from input.Err()
 }
 
 //!-
